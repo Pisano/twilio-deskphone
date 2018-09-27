@@ -22,8 +22,8 @@ module.exports = () => {
           exclude: /node-modules/,
           loader: 'babel-loader',
           options: {
-            plugins: ['lodash'],
-            presets: [['env', { modules: false, targets: { node: 7 } }]]
+            plugins: ['lodash', 'transform-class-properties'],
+            presets: [['env', { modules: false, targets: { node: 7 } }], 'es2015', 'react']
           }
         },
         {
