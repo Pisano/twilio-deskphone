@@ -185,7 +185,7 @@ class Home extends Component {
 
     if ( formattedNumber ) {
       /* Dial the number */
-      Twilio.Device.connect({ phoneNumber: formattedNumber });
+      Twilio.Device.connect({ To: formattedNumber });
 
       this.setState({
         status: 'In call',

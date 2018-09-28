@@ -9,7 +9,7 @@ module.exports = {
       plugins: ["transform-class-properties"]
     },
     production: {
-      plugins: ["transform-react-remove-prop-types"],
+      plugins: ["transform-class-properties", "transform-react-remove-prop-types"],
     }
   },
   plugins: [
