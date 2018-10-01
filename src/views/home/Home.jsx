@@ -2,6 +2,7 @@ import './home.scss';
 import React, { Component } from 'react';
 import { PhoneNumberUtil, PhoneNumberFormat } from 'google-libphonenumber';
 import Call from '../Call';
+import { incomingNumber } from '../../../config.json';
 
 class Home extends Component {
   constructor() {
@@ -15,6 +16,8 @@ class Home extends Component {
       dialNumber: '',
       callList: null,
       muted: false,
+      numberList: null,
+      currentNumber: this.getCurrentNumber(),
       newUsername: this.getUsername(),
     }
   }
@@ -102,7 +105,22 @@ class Home extends Component {
   connect() {
     Twilio.Device.destroy();
     const token = this.getToken();
+    this.getNumbers();
     Twilio.Device.setup( token );
+  }
+
+  getNumbers() {
+    require( 'electron' ).remote.require( './twilio.js' ).getNumbers(numbers => {
+      this.setState({ numberList: numbers });
+    });
+  }
+
+  getCurrentNumber = () => {
+    if ( localStorage.getItem( 'currentNumber' ) == null || localStorage.getItem( 'currentNumber' ) === '' ) {
+      return incomingNumber;
+    } else {
+      return localStorage.getItem( 'currentNumber' );
+    }
   }
 
   getToken() {
@@ -123,7 +141,7 @@ class Home extends Component {
   }
 
   getCallList() {
-    require( 'electron' ).remote.require( './twilio.js' ).getCalls( calls => {
+    require( 'electron' ).remote.require( './twilio.js' ).getCalls(calls => {
       this.setState({ callList: calls });
     });
   }
@@ -145,6 +163,10 @@ class Home extends Component {
       stage: 'waiting',
       caller: '',
     });
+  }
+
+  sendDTMF = (digit) => {
+    Twilio.Device.activeConnection().sendDigits(digit);
   }
 
   disconnectCall = () => {
@@ -171,7 +193,7 @@ class Home extends Component {
   }
 
   dial = () => {
-    const { dialNumber } = this.state;
+    const { dialNumber, currentNumber } = this.state;
     const numberWithArea = dialNumber.length === 8 ? `03${dialNumber}` : dialNumber;
     /* Format the value */
     const phoneUtils = PhoneNumberUtil.getInstance();
@@ -185,7 +207,7 @@ class Home extends Component {
 
     if ( formattedNumber ) {
       /* Dial the number */
-      Twilio.Device.connect({ To: formattedNumber });
+      Twilio.Device.connect({ From: currentNumber, To: formattedNumber });
 
       this.setState({
         status: 'In call',
@@ -201,15 +223,22 @@ class Home extends Component {
     this.setState({ dialNumber: value });
   }
 
+  onNumberChange = e => {
+    let value = e.target.value;
+    this.setState({ currentNumber: value });
+  }
+
   onUsernameChange = e => {
     let value = e.target.value;
     this.setState({ newUsername: value });
   }
 
-  saveUser = () => {
+  saveSettings = () => {
     localStorage.setItem( 'username', this.state.newUsername );
+    localStorage.setItem( 'currentNumber', this.state.currentNumber );
     this.connect();
     this.showPhone();
+    this.getCallList();
   }
 
   showSettings = () => {
@@ -241,6 +270,19 @@ class Home extends Component {
     const mutedClass = muted ? 'decline' : 'make';
     return (
       <div className="buttons animated fadeInDown active">
+        <div className="dialpad">
+          <div className="button digit" onClick={() => this.sendDTMF('1')}>1</div>
+          <div className="button digit" onClick={() => this.sendDTMF('2')}>2</div>
+          <div className="button digit" onClick={() => this.sendDTMF('3')}>3</div>
+          <div className="button digit" onClick={() => this.sendDTMF('4')}>4</div>
+          <div className="button digit" onClick={() => this.sendDTMF('5')}>5</div>
+          <div className="button digit" onClick={() => this.sendDTMF('6')}>6</div>
+          <div className="button digit" onClick={() => this.sendDTMF('7')}>7</div>
+          <div className="button digit" onClick={() => this.sendDTMF('8')}>8</div>
+          <div className="button digit" onClick={() => this.sendDTMF('9')}>9</div>
+          <div className="button digit" onClick={() => this.sendDTMF('*')}>*</div>
+          <div className="button digit" onClick={() => this.sendDTMF('#')}>#</div>
+        </div>
         <i className="material-icons decline" onClick={this.disconnectCall}>call_end</i>
         <i className={`material-icons ${mutedClass}`} onClick={this.toggleMute}>{mutedIcon}</i>
       </div>
@@ -251,7 +293,7 @@ class Home extends Component {
     const { dialValue } = this.state;
     return (
       <div className="dialer">
-        <div className="button back" onClick={this.showPhone}>Back</div>
+        <div className="button back" onClick={this.showPhone}>Cancel</div>
         <p>Enter a phone number below</p>
         <input type="text" onChange={e => this.onDialerChange(e)} defaultValue={dialValue} />
         <div className="button dial" onClick={this.dial}>Dial</div>
@@ -260,18 +302,26 @@ class Home extends Component {
   }
 
   renderSettings() {
+    const { numberList } = this.state;
     return (
       <div className="settings-page">
-        <div className="button back" onClick={this.showPhone}>Back</div>
-        <p>Enter username below</p>
+        <div className="button back" onClick={this.showPhone}>Cancel</div>
+        <p>Active Number:</p>
+        <select value={this.state.currentNumber} onChange={this.onNumberChange}>
+          { numberList && (
+            numberList.map( number => <option key={number.sid} value={number.phone_number}>{number.friendly_name}</option> )
+          )}
+        </select>
+        <p>User Name:</p>
         <input type="text" onChange={e => this.onUsernameChange(e)} defaultValue={this.getUsername()} />
-        <div className="button dial" onClick={this.saveUser}>Update</div>
+        <div className="button dial" onClick={this.saveSettings}>Update</div>
       </div>
     );
   }
 
   render() {
     const { status, caller, stage, callList } = this.state;
+
     return (
       <div className="app">
         <div className="home">
